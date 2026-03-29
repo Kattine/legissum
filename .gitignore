@@ -1,0 +1,47 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ── Data (too large for git) ──────────────────────────────────────────────────
+data/raw/
+data/processed/
+*.jsonl
+*.json
+!src/*.json
+
+# ── Models (too large for git — use HuggingFace Hub instead) ─────────────────
+models/
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs/*.csv
+outputs/*.txt
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── Environment ───────────────────────────────────────────────────────────────
+.env
+.env.local
+*.env
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── VSCode ────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/launch.json
