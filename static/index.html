@@ -622,44 +622,6 @@ footer {
     <!-- ── Tab 2: Before vs After ── -->
     <div class="panel" id="panel-compare">
 
-      <!-- Metric cards -->
-      <div class="metrics-row" id="metrics-row">
-        <div class="metric-card">
-          <div class="metric-label">ROUGE-1 · Unigram Overlap</div>
-          <div class="metric-score" id="m1-ft">—</div>
-          <div class="metric-base" id="m1-base">base: —</div>
-          <div class="metric-desc">Fraction of individual words shared with the reference summary</div>
-        </div>
-        <div class="metric-card highlight">
-          <div class="metric-label gold">ROUGE-2 · Bigram Overlap ↑ improved</div>
-          <div class="metric-score" id="m2-ft">—</div>
-          <div id="m2-delta" class="metric-delta" style="display:none"></div>
-          <div class="metric-base" id="m2-base">base: —</div>
-          <div class="metric-desc">Fraction of two-word phrases shared — the most diagnostic summarization metric</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">ROUGE-L · Longest Subsequence</div>
-          <div class="metric-score" id="mL-ft">—</div>
-          <div class="metric-base" id="mL-base">base: —</div>
-          <div class="metric-desc">Longest common word sequence — measures structural alignment with reference</div>
-        </div>
-      </div>
-
-      <!-- Context bar -->
-      <div class="context-bar">
-        <div class="context-item"><strong>50</strong> test samples evaluated</div>
-        <div class="context-sep"></div>
-        <div class="context-item"><strong>500</strong> training samples</div>
-        <div class="context-sep"></div>
-        <div class="context-item"><strong>1</strong> epoch</div>
-        <div class="context-sep"></div>
-        <div class="context-item">LoRA <strong>r=8</strong></div>
-        <div class="context-sep"></div>
-        <div class="context-item">Mistral-7B-Instruct-v0.3</div>
-        <div class="context-sep"></div>
-        <div class="context-item">Apple M4 Pro · 61 min training</div>
-      </div>
-
       <!-- Comparison navigator -->
       <div class="comp-nav">
         <button class="nav-btn" id="prev-btn" onclick="prevExample()" disabled>← Prev</button>
@@ -678,18 +640,18 @@ footer {
           <div class="comp-col-body before" id="col-base">Loading…</div>
         </div>
         <div class="comp-col">
-          <div class="comp-col-header after">
-            <span class="col-dot"></span>
-            <span class="col-label">LegisSum — After</span>
-          </div>
-          <div class="comp-col-body after" id="col-ft">Loading…</div>
-        </div>
-        <div class="comp-col">
           <div class="comp-col-header reference">
             <span class="col-dot"></span>
             <span class="col-label">Ground Truth — Reference</span>
           </div>
           <div class="comp-col-body reference" id="col-ref">Loading…</div>
+        </div>
+        <div class="comp-col">
+          <div class="comp-col-header after">
+            <span class="col-dot"></span>
+            <span class="col-label">LegisSum — After</span>
+          </div>
+          <div class="comp-col-body after" id="col-ft">Loading…</div>
         </div>
       </div>
 
@@ -699,24 +661,6 @@ footer {
   <!-- Footer -->
   <footer>
     <div class="footer-left">LegisSum &nbsp;·&nbsp; Duke GenAI Hackathon 2026 &nbsp;·&nbsp; Mistral-7B + QLoRA on BillSum</div>
-    <div class="footer-right">
-      <div class="footer-stat">
-        <span class="footer-stat-value">16,000+</span>
-        <span class="footer-stat-label">Training pairs</span>
-      </div>
-      <div class="footer-stat">
-        <span class="footer-stat-value">7B</span>
-        <span class="footer-stat-label">Model params</span>
-      </div>
-      <div class="footer-stat">
-        <span class="footer-stat-value">0.05%</span>
-        <span class="footer-stat-label">Params trained</span>
-      </div>
-      <div class="footer-stat">
-        <span class="footer-stat-value">17 MB</span>
-        <span class="footer-stat-label">Adapter size</span>
-      </div>
-    </div>
   </footer>
 
 </div>

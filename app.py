@@ -34,6 +34,7 @@ STATIC_DIR   = ROOT / "static"
 
 BASE_MODEL_ID = os.environ.get("BASE_MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.3")
 HF_ADAPTER_ID = os.environ.get("HF_MODEL_ID", "")
+DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
 
 SYSTEM_INSTRUCTION = (
     "You are a legislative assistant helping everyday citizens understand U.S. law. "
@@ -52,6 +53,11 @@ _model_error = None
 
 def _load_model_bg():
     global _model, _tokenizer, _model_label, _model_ready, _model_error
+    if DEMO_MODE:
+        _model_label = "Demo mode — live inference disabled"
+        _model_ready = True
+        print("ℹ  DEMO_MODE=1: skipping model load. Tab 2 (Before/After) fully functional.")
+        return
     try:
         print(f"\n⬇  Loading {BASE_MODEL_ID}…")
         if torch.backends.mps.is_available():
@@ -141,6 +147,8 @@ class SummarizeRequest(BaseModel):
 def summarize(req: SummarizeRequest):
     if not _model_ready:
         return JSONResponse({"error": "Model still loading, please wait"}, status_code=503)
+    if DEMO_MODE:
+        return JSONResponse({"error": "Live inference is disabled in demo mode. See the Before vs After tab for pre-computed examples."}, status_code=503)
     summary = _generate(req.text)
     return {"summary": summary, "model_label": _model_label}
 
