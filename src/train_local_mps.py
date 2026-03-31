@@ -29,7 +29,7 @@ MODEL_OUT   = str(Path(__file__).parent.parent / "models" / "billsum-lora")
 DATA_DIR    = Path(__file__).parent.parent / "data" / "processed"
 
 MAX_TRAIN   = 500   # ~30-60 min on M4 Pro; raise to 1500 for better quality
-MAX_SEQ_LEN = 1024
+MAX_SEQ_LEN = 512   # 16GB: keep short to fit activations in memory (1024 will OOM)
 EPOCHS      = 1
 
 HF_USERNAME  = os.environ.get("HF_USERNAME", "")
@@ -99,6 +99,8 @@ model = AutoModelForCausalLM.from_pretrained(
     low_cpu_mem_usage=True,
 )
 model = model.to(DEVICE)
+# Gradient checkpointing trades compute for memory — essential on 16GB
+model.gradient_checkpointing_enable()
 model.enable_input_require_grads()
 
 # ── LoRA ──────────────────────────────────────────────────────────────────────
