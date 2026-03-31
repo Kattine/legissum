@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LegisSum — Congressional Bill Summarizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;0,7..72,600;0,7..72,700;1,7..72,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & tokens ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f5f3ee;
+  --surface:   #ffffff;
+  --surface2:  #faf9f6;
+  --navy:      #1b2e4b;
+  --navy-light:#264573;
+  --gold:      #b8862a;
+  --gold-pale: #f5edda;
+  --red:       #c0392b;
+  --text:      #1c2333;
+  --text-mid:  #4a5568;
+  --text-muted:#8593a8;
+  --border:    #e2ddd4;
+  --border-strong: #c8bfb0;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06);
+  --radius:    6px;
+  --transition: 180ms ease;
+}
+
+html { font-size: 16px; }
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+header {
+  background: var(--navy);
+  color: #fff;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+}
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+}
+.logo-mark {
+  font-family: 'Literata', Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: #fff;
+}
+.logo-sub {
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45);
+}
+.header-badge {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px;
+  padding: .3rem .9rem;
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .06em;
+  color: rgba(255,255,255,.7);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+.dot.loading { background: #facc15; animation: pulse 1.2s infinite; }
+.dot.error { background: #f87171; }
+@keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:.3 } }
+
+/* ── Nav tabs ────────────────────────────────────────────────────────── */
+nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex;
+  gap: 0;
+}
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .9rem 1.4rem;
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition);
+  user-select: none;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.nav-tab:hover { color: var(--navy); }
+.nav-tab.active {
+  color: var(--navy);
+  border-bottom-color: var(--gold);
+}
+.tab-icon { font-size: .9rem; }
+
+/* ── Main content ────────────────────────────────────────────────────── */
+main { flex: 1; padding: 2rem; max-width: 1280px; margin: 0 auto; width: 100%; }
+
+/* ── Panel ───────────────────────────────────────────────────────────── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── Summarize tab ───────────────────────────────────────────────────── */
+.summarize-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 860px) { .summarize-grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.card-header {
+  padding: 1rem 1.25rem .75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.card-body { padding: 1.25rem; }
+
+/* Samples row */
+.samples-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.samples-label {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.sample-chips { display: flex; gap: .4rem; flex-wrap: wrap; flex: 1; }
+.chip {
+  font-size: .72rem;
+  font-weight: 500;
+  padding: .3rem .75rem;
+  border-radius: 20px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface2);
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.chip:hover {
+  background: var(--gold-pale);
+  border-color: var(--gold);
+  color: var(--navy);
+}
+.chip.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+/* Textarea */
+.bill-textarea {
+  width: 100%;
+  min-height: 320px;
+  padding: 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .8rem;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.bill-textarea:focus {
+  border-color: var(--navy-light);
+  box-shadow: 0 0 0 3px rgba(38,69,115,.1);
+  background: var(--surface);
+}
+.bill-textarea::placeholder { color: var(--text-muted); }
+.textarea-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: .5rem;
+}
+.char-count {
+  font-size: .7rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Summarize button */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  width: 100%;
+  padding: .85rem 2rem;
+  margin-top: 1rem;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary:hover { background: var(--navy-light); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { background: var(--text-muted); cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-primary .spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: none;
+}
+.btn-primary.loading .spinner { display: block; }
+.btn-primary.loading .btn-text { opacity: .7; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Output card */
+.output-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem;
+}
+.output-icon { font-size: 2rem; opacity: .4; }
+.output-hint { font-size: .82rem; line-height: 1.6; max-width: 260px; }
+.summary-text {
+  font-family: 'Literata', Georgia, serif;
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text);
+  animation: fadeIn .4s ease;
+}
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
+.model-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-top: 1rem;
+  padding: .3rem .75rem;
+  background: var(--gold-pale);
+  border: 1px solid #e5d5a8;
+  border-radius: 4px;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* ── Before/After tab ────────────────────────────────────────────────── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 640px) { .metrics-row { grid-template-columns: 1fr; } }
+
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--border);
+}
+.metric-card.highlight::before { background: var(--gold); }
+.metric-card.highlight { border-color: #e5d5a8; }
+.metric-label {
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: .5rem;
+}
+.metric-label.gold { color: var(--gold); }
+.metric-score {
+  font-family: 'Literata', Georgia, serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1;
+  margin-bottom: .4rem;
+}
+.metric-card.highlight .metric-score { color: var(--gold); }
+.metric-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .72rem;
+  font-weight: 600;
+  color: #16a34a;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 3px;
+  padding: .15rem .5rem;
+}
+.metric-delta.negative { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+.metric-base {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-top: .35rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+.metric-desc {
+  font-size: .75rem;
+  color: var(--text-muted);
+  margin-top: .4rem;
+  line-height: 1.5;
+}
+
+/* Training context bar */
+.context-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1.25rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .75rem;
+  color: var(--text-mid);
+}
+.context-item strong { color: var(--navy); font-weight: 600; }
+.context-sep { width: 1px; height: 16px; background: var(--border); }
+
+/* Comparison navigation */
+.comp-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.comp-title {
+  font-family: 'Literata', Georgia, serif;
+  font-size: .95rem;
+  font-style: italic;
+  color: var(--text-mid);
+  flex: 1;
+  padding: 0 1rem;
+}
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.nav-btn:hover { border-color: var(--navy); color: var(--navy); background: var(--surface2); }
+.nav-btn:disabled { opacity: .35; cursor: not-allowed; }
+.comp-counter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding: 0 .5rem;
+}
+
+/* Comparison columns */
+.comp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 900px) { .comp-grid { grid-template-columns: 1fr; } }
+
+.comp-col {}
+.comp-col-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem 1rem;
+  border-radius: var(--radius) var(--radius) 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+.comp-col-header.before { background: #fef2f2; border-color: #fecaca; }
+.comp-col-header.after { background: #f0fdf4; border-color: #bbf7d0; }
+.comp-col-header.reference { background: var(--gold-pale); border-color: #e5d5a8; }
+.col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.before .col-dot { background: #ef4444; }
+.after .col-dot { background: #22c55e; }
+.reference .col-dot { background: var(--gold); }
+.col-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.before .col-label { color: #dc2626; }
+.after .col-label { color: #16a34a; }
+.reference .col-label { color: var(--gold); }
+.comp-col-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 1rem;
+  min-height: 240px;
+  font-family: 'Literata', Georgia, serif;
+  font-size: .88rem;
+  line-height: 1.75;
+  color: var(--text);
+}
+.comp-col-body.before { border-color: #fecaca; }
+.comp-col-body.after { border-color: #bbf7d0; }
+.comp-col-body.reference { border-color: #e5d5a8; }
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+footer {
+  background: var(--navy);
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+.footer-left {
+  font-size: .72rem;
+  color: rgba(255,255,255,.4);
+  letter-spacing: .06em;
+}
+.footer-right {
+  display: flex;
+  gap: 1.5rem;
+}
+.footer-stat {
+  text-align: center;
+}
+.footer-stat-value {
+  font-family: 'Literata', Georgia, serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255,255,255,.85);
+}
+.footer-stat-label {
+  font-size: .63rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.35);
+  display: block;
+}
+
+/* ── Misc ────────────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <span class="logo-mark">LegisSum</span>
+      <span class="logo-sub">Congressional Intelligence</span>
+    </div>
+    <div class="header-badge" id="model-status">
+      <span class="dot loading" id="status-dot"></span>
+      <span id="status-text">Loading model…</span>
+    </div>
+  </header>
+
+  <!-- Nav -->
+  <nav>
+    <button class="nav-tab active" onclick="switchTab('summarize', this)">
+      <span class="tab-icon">⚑</span> Summarize a Bill
+    </button>
+    <button class="nav-tab" onclick="switchTab('compare', this)">
+      <span class="tab-icon">⇄</span> Before vs After
+    </button>
+  </nav>
+
+  <!-- Main -->
+  <main>
+
+    <!-- ── Tab 1: Summarize ── -->
+    <div class="panel active" id="panel-summarize">
+      <div class="summarize-grid">
+
+        <!-- Left: Input -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Bill Input</span>
+            </div>
+            <div class="card-body">
+              <div class="samples-row">
+                <span class="samples-label">Load sample</span>
+                <div class="sample-chips" id="sample-chips"></div>
+              </div>
+              <textarea
+                class="bill-textarea"
+                id="bill-input"
+                placeholder="Paste the title and text of any U.S. Congressional bill here…"
+                oninput="updateCharCount()"
+              ></textarea>
+              <div class="textarea-meta">
+                <span class="char-count" id="char-count">0 characters</span>
+                <span class="char-count" id="token-estimate"></span>
+              </div>
+              <button class="btn-primary" id="summarize-btn" onclick="summarize()">
+                <div class="spinner"></div>
+                <span class="btn-text">Generate Plain-English Summary</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Output -->
+        <div>
+          <div class="card" style="min-height: 460px;">
+            <div class="card-header">
+              <span class="card-title">Summary</span>
+              <span id="output-meta" style="font-size:.7rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></span>
+            </div>
+            <div class="card-body" id="output-body">
+              <div class="output-empty">
+                <div class="output-icon">🏛</div>
+                <div class="output-hint">Load a sample or paste bill text, then click <strong>Generate</strong> to see a plain-English summary.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Tab 2: Before vs After ── -->
+    <div class="panel" id="panel-compare">
+
+      <!-- Metric cards -->
+      <div class="metrics-row" id="metrics-row">
+        <div class="metric-card">
+          <div class="metric-label">ROUGE-1 · Unigram Overlap</div>
+          <div class="metric-score" id="m1-ft">—</div>
+          <div class="metric-base" id="m1-base">base: —</div>
+          <div class="metric-desc">Fraction of individual words shared with the reference summary</div>
+        </div>
+        <div class="metric-card highlight">
+          <div class="metric-label gold">ROUGE-2 · Bigram Overlap ↑ improved</div>
+          <div class="metric-score" id="m2-ft">—</div>
+          <div id="m2-delta" class="metric-delta" style="display:none"></div>
+          <div class="metric-base" id="m2-base">base: —</div>
+          <div class="metric-desc">Fraction of two-word phrases shared — the most diagnostic summarization metric</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">ROUGE-L · Longest Subsequence</div>
+          <div class="metric-score" id="mL-ft">—</div>
+          <div class="metric-base" id="mL-base">base: —</div>
+          <div class="metric-desc">Longest common word sequence — measures structural alignment with reference</div>
+        </div>
+      </div>
+
+      <!-- Context bar -->
+      <div class="context-bar">
+        <div class="context-item"><strong>50</strong> test samples evaluated</div>
+        <div class="context-sep"></div>
+        <div class="context-item"><strong>500</strong> training samples</div>
+        <div class="context-sep"></div>
+        <div class="context-item"><strong>1</strong> epoch</div>
+        <div class="context-sep"></div>
+        <div class="context-item">LoRA <strong>r=8</strong></div>
+        <div class="context-sep"></div>
+        <div class="context-item">Mistral-7B-Instruct-v0.3</div>
+        <div class="context-sep"></div>
+        <div class="context-item">Apple M4 Pro · 61 min training</div>
+      </div>
+
+      <!-- Comparison navigator -->
+      <div class="comp-nav">
+        <button class="nav-btn" id="prev-btn" onclick="prevExample()" disabled>← Prev</button>
+        <div class="comp-title" id="comp-bill-title">Loading examples…</div>
+        <span class="comp-counter" id="comp-counter"></span>
+        <button class="nav-btn" id="next-btn" onclick="nextExample()">Next →</button>
+      </div>
+
+      <!-- Three columns -->
+      <div class="comp-grid">
+        <div class="comp-col">
+          <div class="comp-col-header before">
+            <span class="col-dot"></span>
+            <span class="col-label">Base Model — Before</span>
+          </div>
+          <div class="comp-col-body before" id="col-base">Loading…</div>
+        </div>
+        <div class="comp-col">
+          <div class="comp-col-header after">
+            <span class="col-dot"></span>
+            <span class="col-label">LegisSum — After</span>
+          </div>
+          <div class="comp-col-body after" id="col-ft">Loading…</div>
+        </div>
+        <div class="comp-col">
+          <div class="comp-col-header reference">
+            <span class="col-dot"></span>
+            <span class="col-label">Ground Truth — Reference</span>
+          </div>
+          <div class="comp-col-body reference" id="col-ref">Loading…</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-left">LegisSum &nbsp;·&nbsp; Duke GenAI Hackathon 2026 &nbsp;·&nbsp; Mistral-7B + QLoRA on BillSum</div>
+    <div class="footer-right">
+      <div class="footer-stat">
+        <span class="footer-stat-value">16,000+</span>
+        <span class="footer-stat-label">Training pairs</span>
+      </div>
+      <div class="footer-stat">
+        <span class="footer-stat-value">7B</span>
+        <span class="footer-stat-label">Model params</span>
+      </div>
+      <div class="footer-stat">
+        <span class="footer-stat-value">0.05%</span>
+        <span class="footer-stat-label">Params trained</span>
+      </div>
+      <div class="footer-stat">
+        <span class="footer-stat-value">17 MB</span>
+        <span class="footer-stat-label">Adapter size</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+// ── Sample bills ──────────────────────────────────────────────────────
+const SAMPLES = {
+  "Infrastructure": `H.R. 3684 — Infrastructure Investment and Jobs Act\n\nThis Act provides for the improvement of the nation's infrastructure, including roads, bridges, broadband internet, clean water systems, and passenger and freight rail. The bill authorizes $550 billion in new federal spending over five years. Funds are allocated to the Department of Transportation, the Environmental Protection Agency, and other federal agencies. States must submit plans for spending approval. Projects must comply with Buy America requirements, ensuring that iron, steel, and manufactured products are produced in the United States.`,
+  "Drug Pricing": `S. 1234 — Affordable Prescription Drug Act\n\nThis Act authorizes the Secretary of Health and Human Services to negotiate directly with pharmaceutical manufacturers to lower the prices of prescription drugs covered under Medicare Part D. The bill caps out-of-pocket drug costs for Medicare beneficiaries at $2,000 per year. Manufacturers who raise prices faster than inflation must pay rebates to the federal government. The Congressional Budget Office estimates this will reduce federal drug spending by $288 billion over 10 years.`,
+  "Student Loans": `H.R. 5678 — Student Loan Forgiveness Act\n\nThis Act establishes a program for the cancellation of outstanding federal student loan debt for borrowers who have made payments for at least 20 years under an income-driven repayment plan. Eligible borrowers include those with undergraduate and graduate loans issued by the Department of Education. Borrowers employed in public service jobs may qualify after 10 years of payments. The Department of Education must provide written notice to all eligible borrowers within 180 days of enactment.`,
+  "Clean Energy": `S. 2112 — Clean Energy Transition and Jobs Act\n\nThis Act establishes a Clean Energy Accelerator within the Department of Energy to provide grants and low-interest loans for the deployment of solar, wind, geothermal, and battery storage technologies. The bill requires electric utilities to obtain 80 percent of their electricity from clean energy sources by 2035. It creates a Clean Energy Manufacturing Tax Credit for domestic production of solar panels, wind turbines, and electric vehicle batteries. The Act also establishes a Civilian Climate Corps to employ 300,000 workers in conservation, resilience, and clean energy projects on public lands and coastal areas.`,
+  "Veterans": `H.R. 4421 — Veterans Mental Health Care Improvement Act\n\nThis Act directs the Secretary of Veterans Affairs to expand mental health services for veterans, including same-day access to mental health care at all VA medical centers. The bill authorizes $500 million annually to hire additional licensed mental health providers and peer support specialists. It requires the VA to screen all veterans for military sexual trauma, post-traumatic stress disorder, and traumatic brain injury. Veterans in rural areas must be provided telehealth services within 30 days of a request.`,
+  "Data Privacy": `S. 3301 — American Data Privacy and Protection Act\n\nThis Act establishes a federal baseline for data privacy, requiring companies that collect personal data on more than 100,000 individuals to provide clear notice and obtain opt-in consent before sharing sensitive data with third parties. The Federal Trade Commission is granted authority to enforce violations with civil penalties of up to $50,000 per day per violation. The bill bans the sale of precise geolocation and health data without explicit consent. Individuals have the right to access, correct, and delete their personal data.`,
+  "Sentencing Reform": `H.R. 7890 — Fair Sentencing Modernization Act\n\nThis Act reduces mandatory minimum sentences for certain non-violent drug offenses and expands the safety valve provision to allow judges discretion in sentencing first-time, low-level offenders. The bill makes retroactive the reduction in the crack-to-powder cocaine sentencing disparity enacted in 2010. It establishes a federal Second Chance Grant Program providing $200 million annually to state and local reentry programs including job training, housing assistance, and substance abuse treatment.`,
+  "Immigration": `H.R. 6789 — Border Security and Humanitarian Processing Act\n\nThis Act authorizes the hiring of 2,000 additional U.S. Customs and Border Protection officers and 1,500 immigration judges to reduce case backlogs. The bill establishes Humanitarian Processing Centers at ports of entry where asylum seekers may present claims in an orderly and safe manner. It requires asylum applications to be adjudicated within 180 days. The Act provides $2.5 billion for technology upgrades including biometric screening and vehicle inspection equipment.`,
+  "Forage Fees (Eval)": `Federal Forage Fee Act of 1993\n\nSECTION 1. This Act may be cited as the 'Federal Forage Fee Act of 1993'.\n\nSECTION 2. FINDINGS AND PURPOSE. The Congress finds that public lands contain valuable forage resources; in many areas of the West, public and private lands are interdependent for forage, water, and wildlife habitat; Federal grazing fees have not kept pace with the fair market value of forage on private lands.\n\nSECTION 3. FORAGE FEES. All grazing operations conducted on Federal land shall be subject to applicable Federal, State, and local environmental and land use requirements. The Secretary of Agriculture and the Secretary of the Interior shall establish a forage fee formula based on fair market value of forage, assessed on a per animal unit month basis.`,
+  "Gold Medal (Eval)": `Merchant Marine of World War II Congressional Gold Medal Act\n\nSECTION 1. This Act may be cited as the 'Merchant Marine of World War II Congressional Gold Medal Act'.\n\nSECTION 2. FINDINGS. The Congress finds: 2015 marks the 70th anniversary of the Allied victory in World War II. The United States Merchant Marine was integral in providing the link between domestic production and the fighting forces overseas, supplying combat equipment, fuel, food, commodities, and raw materials. Fleet Admiral Ernest J. King acknowledged the indispensability of the Merchant Marine. The Merchant Marine suffered a higher per capita casualty rate than any other U.S. service.\n\nSECTION 3. The Speaker of the House and the President pro tempore of the Senate shall award a single gold medal to the United States Merchant Marine of World War II, to be displayed at the American Merchant Marine Museum.`,
+};
+
+// Build chips
+const chipsEl = document.getElementById('sample-chips');
+let activeSample = null;
+Object.keys(SAMPLES).forEach(name => {
+  const btn = document.createElement('button');
+  btn.className = 'chip';
+  btn.textContent = name;
+  btn.onclick = () => loadSample(name, btn);
+  chipsEl.appendChild(btn);
+});
+
+function loadSample(name, el) {
+  document.getElementById('bill-input').value = SAMPLES[name];
+  updateCharCount();
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function updateCharCount() {
+  const txt = document.getElementById('bill-input').value;
+  document.getElementById('char-count').textContent = txt.length.toLocaleString() + ' characters';
+  const est = Math.round(txt.length / 4);
+  document.getElementById('token-estimate').textContent = est > 0 ? '~' + est.toLocaleString() + ' tokens' : '';
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────
+function switchTab(tab, el) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+// ── Summarize ─────────────────────────────────────────────────────────
+let modelReady = false;
+
+async function checkStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    if (d.status === 'ready') {
+      document.getElementById('status-dot').className = 'dot';
+      document.getElementById('status-text').textContent = d.label || 'Model ready';
+      modelReady = true;
+    } else {
+      setTimeout(checkStatus, 2000);
+    }
+  } catch { setTimeout(checkStatus, 3000); }
+}
+checkStatus();
+
+async function summarize() {
+  const text = document.getElementById('bill-input').value.trim();
+  if (!text) return;
+
+  const btn = document.getElementById('summarize-btn');
+  btn.disabled = true; btn.classList.add('loading');
+
+  const t0 = Date.now();
+  document.getElementById('output-body').innerHTML = `
+    <div class="output-empty">
+      <div class="output-icon" style="animation:spin 1s linear infinite;display:inline-block">⏳</div>
+      <div class="output-hint">Generating summary…<br><small style="color:var(--text-muted)">First run loads the model (~30s)</small></div>
+    </div>`;
+
+  try {
+    const r = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text}),
+    });
+    const d = await r.json();
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    document.getElementById('output-meta').textContent = elapsed + 's';
+    document.getElementById('output-body').innerHTML = `
+      <div class="summary-text">${escHtml(d.summary)}</div>
+      <div class="model-badge">⚑ ${escHtml(d.model_label)}</div>`;
+  } catch(e) {
+    document.getElementById('output-body').innerHTML = `
+      <div class="output-empty" style="color:var(--red)">
+        <div class="output-icon">⚠</div>
+        <div class="output-hint">Error: ${escHtml(e.message)}</div>
+      </div>`;
+  }
+
+  btn.disabled = false; btn.classList.remove('loading');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ── Comparisons ───────────────────────────────────────────────────────
+let comparisons = [];
+let compIdx = 0;
+
+async function loadCompare() {
+  try {
+    const [cr, rr] = await Promise.all([
+      fetch('/api/comparisons').then(r => r.json()),
+      fetch('/api/rouge').then(r => r.json()),
+    ]);
+    comparisons = cr;
+    renderRouge(rr);
+    renderExample(0);
+  } catch {}
+}
+loadCompare();
+
+function renderRouge(r) {
+  const b = r.base, f = r.finetuned;
+  document.getElementById('m1-ft').textContent = f.rouge1.toFixed(4);
+  document.getElementById('m1-base').textContent = 'base: ' + b.rouge1.toFixed(4);
+  document.getElementById('m2-ft').textContent = f.rouge2.toFixed(4);
+  document.getElementById('m2-base').textContent = 'base: ' + b.rouge2.toFixed(4);
+  const d2 = f.rouge2 - b.rouge2;
+  const el = document.getElementById('m2-delta');
+  el.style.display = 'inline-flex';
+  el.textContent = (d2 >= 0 ? '+' : '') + d2.toFixed(4);
+  el.className = 'metric-delta' + (d2 < 0 ? ' negative' : '');
+  document.getElementById('mL-ft').textContent = f.rougeL.toFixed(4);
+  document.getElementById('mL-base').textContent = 'base: ' + b.rougeL.toFixed(4);
+}
+
+function renderExample(i) {
+  if (!comparisons.length) return;
+  compIdx = i;
+  const ex = comparisons[i];
+  document.getElementById('comp-bill-title').textContent = ex.title || '';
+  document.getElementById('col-base').innerHTML = escHtml(ex.base_model || '');
+  document.getElementById('col-ft').innerHTML = escHtml(ex.finetuned || '');
+  document.getElementById('col-ref').innerHTML = escHtml(ex.reference || '');
+  document.getElementById('comp-counter').textContent = (i+1) + ' / ' + comparisons.length;
+  document.getElementById('prev-btn').disabled = i === 0;
+  document.getElementById('next-btn').disabled = i === comparisons.length - 1;
+}
+
+function prevExample() { if (compIdx > 0) renderExample(compIdx - 1); }
+function nextExample() { if (compIdx < comparisons.length - 1) renderExample(compIdx + 1); }
+</script>
+</body>
+</html>
