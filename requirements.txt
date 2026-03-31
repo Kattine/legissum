@@ -16,6 +16,9 @@ tqdm>=4.66.0
 python-dotenv>=1.0.0        # For .env API keys if needed
 jsonlines>=4.0.0
 
+# ── Demo UI ───────────────────────────────────────────────────────────────────
+gradio>=4.0.0
+
 # ── Notebook / viz (optional) ─────────────────────────────────────────────────
 jupyter>=1.0.0
 matplotlib>=3.7.0

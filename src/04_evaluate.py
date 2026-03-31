@@ -11,7 +11,7 @@ import torch
 import csv
 from tqdm import tqdm
 from rouge_score import rouge_scorer as rouge_lib
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
@@ -33,17 +33,23 @@ SYSTEM_INSTRUCTION = (
 
 
 def load_model(base_model_id: str, adapter_path: str | None = None):
-    bnb = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
+    # Use MPS on Apple Silicon, CUDA if available, else CPU
+    if torch.backends.mps.is_available():
+        device = "mps"
+    elif torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+
     tokenizer = AutoTokenizer.from_pretrained(base_model_id)
     tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(
-        base_model_id, quantization_config=bnb, device_map="auto"
-    )
+        base_model_id,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+    ).to(device)
+
     if adapter_path and os.path.exists(adapter_path):
         model = PeftModel.from_pretrained(model, adapter_path)
         print(f"  ✅ Loaded LoRA adapters from {adapter_path}")
@@ -151,6 +157,12 @@ def main():
     out_scores = os.path.join(OUTPUTS_DIR, "rouge_scores.json")
     with open(out_scores, "w") as f:
         json.dump({"base": scores_base, "finetuned": scores_ft}, f, indent=2)
+
+    # Save a few rich examples for the Gradio demo (Tab 2 — Before vs After)
+    sample_comparisons = results[:5]
+    out_samples = os.path.join(OUTPUTS_DIR, "sample_comparisons.json")
+    with open(out_samples, "w", encoding="utf-8") as f:
+        json.dump(sample_comparisons, f, indent=2, ensure_ascii=False)
 
     print(f"\n💾 Results saved to outputs/")
 

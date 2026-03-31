@@ -1,0 +1,12 @@
+{
+  "base": {
+    "rouge1": 0.4643,
+    "rouge2": 0.2062,
+    "rougeL": 0.2901
+  },
+  "finetuned": {
+    "rouge1": 0.4474,
+    "rouge2": 0.2138,
+    "rougeL": 0.2824
+  }
+}
