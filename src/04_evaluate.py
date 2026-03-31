@@ -10,7 +10,7 @@ import json
 import torch
 import csv
 from tqdm import tqdm
-from rouge_score import rouge_scorer as rouge_lib
+from bert_score import score as bert_score_fn
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 
@@ -81,15 +81,13 @@ def summarize(model, tokenizer, bill_text: str, max_new_tokens: int = 300) -> st
     return decoded.strip()
 
 
-def score_rouge(predictions: list[str], references: list[str]) -> dict:
-    scorer = rouge_lib.RougeScorer(["rouge1", "rouge2", "rougeL"], use_stemmer=True)
-    agg = {"rouge1": 0.0, "rouge2": 0.0, "rougeL": 0.0}
-    for pred, ref in zip(predictions, references):
-        s = scorer.score(ref, pred)
-        for k in agg:
-            agg[k] += s[k].fmeasure
-    n = len(predictions)
-    return {k: round(v / n, 4) for k, v in agg.items()}
+def score_bertscore(predictions: list[str], references: list[str]) -> dict:
+    P, R, F1 = bert_score_fn(predictions, references, lang="en", verbose=False)
+    return {
+        "precision": round(P.mean().item(), 4),
+        "recall":    round(R.mean().item(), 4),
+        "f1":        round(F1.mean().item(), 4),
+    }
 
 
 def main():
@@ -136,16 +134,18 @@ def main():
             print(f"✅ AFTER  (fine-tuned):\n{pred_ft}\n")
             print(f"🏛️  Ground truth:\n{ref}\n")
 
-    # ── ROUGE scores ──────────────────────────────────────────────────────────
-    scores_base = score_rouge(preds_base, refs)
-    scores_ft   = score_rouge(preds_ft,   refs)
+    # ── BERTScore ─────────────────────────────────────────────────────────────
+    print("\n🔢 Computing BERTScore (base)…")
+    scores_base = score_bertscore(preds_base, refs)
+    print("🔢 Computing BERTScore (fine-tuned)…")
+    scores_ft   = score_bertscore(preds_ft,   refs)
 
-    print("\n📊 ROUGE Scores")
-    print(f"{'Metric':<12} {'Base Model':>12} {'Fine-tuned':>12} {'Δ Improvement':>14}")
-    print("-" * 52)
-    for k in ["rouge1", "rouge2", "rougeL"]:
+    print("\n📊 BERTScore Results")
+    print(f"{'Metric':<12} {'Base Model':>12} {'Fine-tuned':>12} {'Δ':>10}")
+    print("-" * 50)
+    for k in ["precision", "recall", "f1"]:
         delta = scores_ft[k] - scores_base[k]
-        print(f"{k:<12} {scores_base[k]:>12.4f} {scores_ft[k]:>12.4f} {delta:>+14.4f}")
+        print(f"{k:<12} {scores_base[k]:>12.4f} {scores_ft[k]:>12.4f} {delta:>+10.4f}")
 
     # ── Save results ──────────────────────────────────────────────────────────
     out_csv = os.path.join(OUTPUTS_DIR, "eval_results.csv")
@@ -154,7 +154,7 @@ def main():
         writer.writeheader()
         writer.writerows(results)
 
-    out_scores = os.path.join(OUTPUTS_DIR, "rouge_scores.json")
+    out_scores = os.path.join(OUTPUTS_DIR, "bertscore_scores.json")
     with open(out_scores, "w") as f:
         json.dump({"base": scores_base, "finetuned": scores_ft}, f, indent=2)
 
